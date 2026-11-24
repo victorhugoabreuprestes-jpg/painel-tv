@@ -12,7 +12,7 @@
   .card { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; min-height:0; min-width:0; overflow:hidden; }
   .agenda { grid-row:1 / span 2; }
   .tag { position:absolute; left:10px; top:8px; z-index:2; font-size:13px; color:var(--muted); background:rgba(8,11,16,.7); padding:3px 8px; border-radius:6px; }
-  iframe, img, video { width:100%; height:100%; border:0; object-fit:contain; background:#080b10; display:block; }
+  iframe, img { width:100%; height:100%; border:0; object-fit:contain; background:#080b10; display:block; }
   .msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
   .msg[hidden] { display:none; }
   #clock { position:absolute; right:10px; top:8px; z-index:3; font-size:14px; color:var(--text); background:rgba(8,11,16,.7); padding:3px 8px; border-radius:6px; }
@@ -34,9 +34,7 @@
 
   <section class="card">
     <span class="tag">Relógio ao vivo</span>
-    <img id="relogio" alt="Transmissão do relógio" hidden>
-    <iframe id="relogioFrame" title="Transmissão do relógio" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen hidden></iframe>
-    <div id="relogioMsg" class="msg">Transmissão não configurada.</div>
+    <iframe id="relogioFrame" title="Transmissão do relógio" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
   </section>
 </main>
 <div id="clock">--:--</div>
@@ -45,7 +43,7 @@
   // ===== CONFIGURAÇÕES DO PAINEL =====
   const CALENDAR_URL = "https://outlook.office365.com/owa/calendar/8d52ee2b21334f289618adbd21040619@sistemafiep.org.br/a963dd084c9e48a8b7281a55dc69411410467635187235794292/calendar.html";
   const CAM_URL = "http://192.168.65.121:8080/stream/getvideo";
-  const RELOGIO_URL = "https://www.youtube.com/embed/kPAL45DqaAM?autoplay=1&mute=1&playsinline=1&rel=0";
+  const YOUTUBE_VIDEO_ID = "kPAL45DqaAM";
   // ===================================
 
   // Relógio do canto da tela
@@ -60,38 +58,23 @@
     document.getElementById('agendaMsg').hidden = true;
   }
 
-  // Conexão automática para stream MJPEG
-  function setupStream(url, imgEl, msgEl, nome) {
-    if (!url) return;
-    function connect() {
-      imgEl.onload = () => { imgEl.hidden = false; msgEl.hidden = true; };
-      imgEl.onerror = () => {
-        imgEl.hidden = true; msgEl.hidden = false;
-        msgEl.textContent = `Sem sinal (${nome}). Tentando de novo…`;
-        setTimeout(connect, 8000);
-      };
-      imgEl.src = url + '?t=' + Date.now();
-    }
-    connect();
+  // Câmera principal (stream MJPEG com reconexão automática)
+  const cam = document.getElementById('cam'), camMsg = document.getElementById('camMsg');
+  function connectCam() {
+    cam.onload = () => { cam.hidden = false; camMsg.hidden = true; };
+    cam.onerror = () => {
+      cam.hidden = true; camMsg.hidden = false;
+      camMsg.textContent = 'Sem sinal da câmera. Tentando de novo…';
+      setTimeout(connectCam, 8000);
+    };
+    cam.src = CAM_URL + '?t=' + Date.now();
   }
+  connectCam();
 
-  // Câmera principal
-  setupStream(CAM_URL, document.getElementById('cam'), document.getElementById('camMsg'), 'Câmera');
-
-  // Transmissão do relógio ao vivo
-  if (RELOGIO_URL) {
-    const relImg = document.getElementById('relogio');
-    const relFrame = document.getElementById('relogioFrame');
-    const relMsg = document.getElementById('relogioMsg');
-
-    if (RELOGIO_URL.includes('youtube.com/embed') || RELOGIO_URL.includes('youtu.be') || RELOGIO_URL.endsWith('.html')) {
-      relFrame.src = RELOGIO_URL;
-      relFrame.hidden = false;
-      relMsg.hidden = true;
-    } else {
-      setupStream(RELOGIO_URL, relImg, relMsg, 'Relógio');
-    }
-  }
+  // Transmissão do YouTube (com origin explícito para evitar bloqueio no GitHub Pages)
+  const relFrame = document.getElementById('relogioFrame');
+  const originParam = encodeURIComponent(window.location.origin);
+  relFrame.src = `https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&playsinline=1&rel=0&origin=${originParam}`;
 
   // Recarrega a página 1x por dia para limpar memória no Raspberry Pi
   setTimeout(() => location.reload(), 24 * 60 * 60 * 1000);
