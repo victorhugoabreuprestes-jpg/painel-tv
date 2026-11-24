@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel da TV</title>
+<style>
+  :root { color-scheme: dark; --bg:#10151d; --panel:#1b2430; --line:#303c4b; --text:#f3f6fa; --muted:#aeb9c7; --accent:#72a7ff; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; overflow:hidden; background:var(--bg); color:var(--text); font:16px/1.4 Arial, sans-serif; cursor:none; }
+  main { display:grid; grid-template-columns:65fr 35fr; grid-template-rows:1fr 1fr; gap:10px; padding:10px; height:100vh; }
+  .card { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; min-height:0; min-width:0; overflow:hidden; }
+  .agenda { grid-row:1 / span 2; }
+  .tag { position:absolute; left:10px; top:8px; z-index:2; font-size:13px; color:var(--muted); background:rgba(8,11,16,.7); padding:3px 8px; border-radius:6px; }
+  iframe, img, video { width:100%; height:100%; border:0; object-fit:contain; background:#080b10; display:block; }
+  .msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  .msg[hidden] { display:none; }
+  #clock { position:absolute; right:10px; top:8px; z-index:3; font-size:14px; color:var(--text); background:rgba(8,11,16,.7); padding:3px 8px; border-radius:6px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="card agenda">
+    <span class="tag">Agenda</span>
+    <iframe id="agenda" title="Agenda" hidden></iframe>
+    <div id="agendaMsg" class="msg">Agenda não configurada.</div>
+  </section>
+
+  <section class="card">
+    <span class="tag">Câmera</span>
+    <img id="cam" alt="Câmera" hidden>
+    <div id="camMsg" class="msg">Conectando à câmera…</div>
+  </section>
+
+  <section class="card">
+    <span class="tag">Relógio ao vivo</span>
+    <img id="relogio" alt="Transmissão do relógio" hidden>
+    <iframe id="relogioFrame" title="Transmissão do relógio" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen hidden></iframe>
+    <div id="relogioMsg" class="msg">Transmissão não configurada.</div>
+  </section>
+</main>
+<div id="clock">--:--</div>
+
+<script>
+  // ===== CONFIGURAÇÕES DO PAINEL =====
+  const CALENDAR_URL = "https://outlook.office365.com/owa/calendar/8d52ee2b21334f289618adbd21040619@sistemafiep.org.br/a963dd084c9e48a8b7281a55dc69411410467635187235794292/calendar.html";
+  const CAM_URL = "http://192.168.65.121:8080/stream/getvideo";
+  const RELOGIO_URL = "https://www.youtube.com/embed/kPAL45DqaAM?autoplay=1&mute=1&playsinline=1&rel=0";
+  // ===================================
+
+  // Relógio do canto da tela
+  const clock = document.getElementById('clock');
+  const tick = () => clock.textContent = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' }).format(new Date());
+  tick(); setInterval(tick, 15000);
+
+  // Agenda corporativa
+  if (CALENDAR_URL) {
+    const f = document.getElementById('agenda');
+    f.src = CALENDAR_URL; f.hidden = false;
+    document.getElementById('agendaMsg').hidden = true;
+  }
+
+  // Conexão automática para stream MJPEG
+  function setupStream(url, imgEl, msgEl, nome) {
+    if (!url) return;
+    function connect() {
+      imgEl.onload = () => { imgEl.hidden = false; msgEl.hidden = true; };
+      imgEl.onerror = () => {
+        imgEl.hidden = true; msgEl.hidden = false;
+        msgEl.textContent = `Sem sinal (${nome}). Tentando de novo…`;
+        setTimeout(connect, 8000);
+      };
+      imgEl.src = url + '?t=' + Date.now();
+    }
+    connect();
+  }
+
+  // Câmera principal
+  setupStream(CAM_URL, document.getElementById('cam'), document.getElementById('camMsg'), 'Câmera');
+
+  // Transmissão do relógio ao vivo
+  if (RELOGIO_URL) {
+    const relImg = document.getElementById('relogio');
+    const relFrame = document.getElementById('relogioFrame');
+    const relMsg = document.getElementById('relogioMsg');
+
+    if (RELOGIO_URL.includes('youtube.com/embed') || RELOGIO_URL.includes('youtu.be') || RELOGIO_URL.endsWith('.html')) {
+      relFrame.src = RELOGIO_URL;
+      relFrame.hidden = false;
+      relMsg.hidden = true;
+    } else {
+      setupStream(RELOGIO_URL, relImg, relMsg, 'Relógio');
+    }
+  }
+
+  // Recarrega a página 1x por dia para limpar memória no Raspberry Pi
+  setTimeout(() => location.reload(), 24 * 60 * 60 * 1000);
+</script>
+</body>
+</html>
